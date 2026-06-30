@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getCharts, getMoods, getMoodPlaylists, extractTrackInfo, search } from '../api'
+import { getCharts, getMoods, getMoodPlaylists, getRecommendations, extractTrackInfo, search } from '../api'
 import { usePlayerStore } from '../store'
-import { Play, Heart, MoreHorizontal, TrendingUp, Music, Search } from 'lucide-react'
+import { Play, Heart, MoreHorizontal, TrendingUp, Music, Search, Sparkles } from 'lucide-react'
 
 function Home() {
   const [charts, setCharts] = useState([])
   const [moods, setMoods] = useState([])
   const [moodPlaylists, setMoodPlaylists] = useState([])
+  const [recommendations, setRecommendations] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedMood, setSelectedMood] = useState(null)
   const [error, setError] = useState(null)
@@ -31,7 +32,16 @@ function Home() {
         setMoods(moodsRes.data.moods || [])
       } catch (ytError) {
         console.log('YouTube Music auth required for charts/moods')
-        // Don't show error - we have recommendations as fallback
+        // Don't show error - fall back to recommendations
+      }
+      
+      // Always try to get recommendations (works with just app auth)
+      try {
+        const recoRes = await getRecommendations(20)
+        const recoData = recoRes.data?.recommendations || recoRes.data || []
+        setRecommendations(Array.isArray(recoData) ? recoData : [])
+      } catch (recoError) {
+        console.log('Recommendations unavailable:', recoError)
       }
       
     } catch (err) {
@@ -77,7 +87,7 @@ function Home() {
   }
   
   // Check if there's any content to display
-  const hasContent = charts?.length > 0 || moods?.length > 0
+  const hasContent = charts?.length > 0 || moods?.length > 0 || recommendations?.length > 0
   
   return (
     <div>
@@ -125,6 +135,7 @@ function Home() {
                     <img 
                       src={chart.items[0].thumbnail.thumbnails?.[0]?.url} 
                       alt={chart.title}
+                      loading="lazy"
                     />
                   ) : (
                     <div style={{ 
@@ -181,6 +192,7 @@ function Home() {
                     <img 
                       src={playlist.thumbnail?.thumbnails?.[0]?.url || playlist.thumbnail} 
                       alt={playlist.title}
+                      loading="lazy"
                     />
                   </div>
                   <div className="card-content">
@@ -196,8 +208,64 @@ function Home() {
         </section>
       )}
       
+      {/* Recommendations Section - shows even without YouTube Music auth */}
+      {recommendations.length > 0 && (
+        <section className="section">
+          <div className="section-header">
+            <h2 className="section-title">
+              <Sparkles size={24} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+              Recommended for You
+            </h2>
+          </div>
+          
+          <ul className="track-list">
+            {recommendations.slice(0, 10).map((item, index) => {
+              const track = extractTrackInfo(item)
+              if (!track) return null
+              return (
+                <li 
+                  key={index}
+                  className="track-item"
+                  onClick={() => playTrack(track, recommendations.map(r => extractTrackInfo(r)).filter(Boolean))}
+                >
+                  <span className="track-number">{index + 1}</span>
+                  <div className="card-image" style={{ 
+                    width: 48, 
+                    height: 48, 
+                    marginRight: 'var(--spacing-md)',
+                    borderRadius: 'var(--radius-sm)',
+                    flexShrink: 0
+                  }}>
+                    <img 
+                      src={track.thumbnail} 
+                      alt={track.title}
+                      loading="lazy"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  </div>
+                  <div className="track-info">
+                    <span className="track-title">{track.title}</span>
+                    <span className="track-artist">{track.artist}</span>
+                  </div>
+                  <button 
+                    className="player-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      playTrack(track, recommendations.map(r => extractTrackInfo(r)).filter(Boolean))
+                    }}
+                    aria-label="Play track"
+                  >
+                    <Play size={16} />
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+      )}
+      
       {/* If no content at all */}
-      {!hasContent && (
+      {!hasContent && recommendations.length === 0 && (
         <div className="empty-state">
           <Music className="empty-state-icon" />
           <h3 className="empty-state-title">Welcome to Soundscape!</h3>

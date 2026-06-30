@@ -79,6 +79,7 @@ function Album() {
           <img 
             src={album.thumbnail?.thumbnails?.[0]?.url || album.thumbnail} 
             alt={album.title}
+            loading="lazy"
           />
         </div>
         <div className="album-info">

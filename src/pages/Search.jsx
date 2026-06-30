@@ -91,6 +91,7 @@ function Search() {
               placeholder="Search for songs, artists, albums..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              autoFocus
             />
           </div>
         </div>
@@ -169,7 +170,7 @@ function Search() {
                     <li 
                       key={index}
                       className="track-item"
-                      onClick={() => handlePlayTrack(track, results.map(r => extractTrackInfo(r)).filter(Boolean))}
+                      onClick={(e) => handlePlayTrack(track, results.map(r => extractTrackInfo(r)).filter(Boolean), e)}
                     >
                       <span className="track-number">{index + 1}</span>
                       <div className="card-image" style={{ 
@@ -182,6 +183,7 @@ function Search() {
                         <img 
                           src={track.thumbnail || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`} 
                           alt={track.title}
+                          loading="lazy"
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       </div>
@@ -201,6 +203,7 @@ function Search() {
                       <img 
                         src={item.thumbnail?.thumbnails?.[0]?.url || item.thumbnail || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`} 
                         alt={item.title}
+                        loading="lazy"
                       />
                     </div>
                     <div className="card-content">
@@ -220,6 +223,7 @@ function Search() {
                       <img 
                         src={item.thumbnail?.thumbnails?.[0]?.url || item.thumbnail || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`} 
                         alt={item.title}
+                        loading="lazy"
                       />
                     </div>
                     <div className="card-content">
@@ -237,6 +241,7 @@ function Search() {
                       <img 
                         src={item.thumbnail?.thumbnails?.[0]?.url || item.thumbnail || `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`} 
                         alt={item.title}
+                        loading="lazy"
                       />
                     </div>
                     <div className="card-content">

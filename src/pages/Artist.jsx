@@ -73,6 +73,7 @@ function Artist() {
           <img 
             src={artist.thumbnail?.thumbnails?.[0]?.url || artist.banner?.thumbnails?.[0]?.url || artist.avatar?.thumbnails?.[0]?.url} 
             alt={artist.name}
+            loading="lazy"
           />
         </div>
         <div className="artist-info">
@@ -114,6 +115,7 @@ function Artist() {
                   <img 
                     src={track.thumbnail} 
                     alt={track.title}
+                    loading="lazy"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 </div>
@@ -142,6 +144,7 @@ function Artist() {
                   <img 
                     src={album.thumbnail?.thumbnails?.[0]?.url || album.thumbnail} 
                     alt={album.title}
+                    loading="lazy"
                   />
                 </div>
                 <div className="card-content">

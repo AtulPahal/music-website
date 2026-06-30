@@ -63,6 +63,7 @@ function PlaylistDetail() {
           <img 
             src={playlist.thumbnail?.thumbnails?.[0]?.url || playlist.thumbnail} 
             alt={playlist.title}
+            loading="lazy"
           />
         </div>
         <div className="album-info">
@@ -122,6 +123,7 @@ function PlaylistDetail() {
                 <img 
                   src={track.thumbnail} 
                   alt={track.title}
+                  loading="lazy"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
               </div>

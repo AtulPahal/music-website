@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { getLibraryPlaylists, getCharts } from '../api'
-import { ListMusic, Plus, Music } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { getLibraryPlaylists, createPlaylist } from '../api'
+import { ListMusic, Plus } from 'lucide-react'
 
 function Playlists() {
+  const navigate = useNavigate()
   const [playlists, setPlaylists] = useState([])
   const [loading, setLoading] = useState(true)
   
@@ -20,6 +21,25 @@ function Playlists() {
       console.error('Failed to load playlists:', error)
     } finally {
       setLoading(false)
+    }
+  }
+  
+  const handleCreatePlaylist = async () => {
+    const name = prompt('Enter a name for your new playlist:')
+    if (!name || !name.trim()) return
+    
+    try {
+      const res = await createPlaylist(name.trim())
+      const playlistId = res.data.playlistId || res.data.id
+      if (playlistId) {
+        navigate(`/playlist/${playlistId}`)
+      } else {
+        // Reload the list if we can't navigate directly
+        loadPlaylists()
+      }
+    } catch (err) {
+      console.error('Failed to create playlist:', err)
+      alert('Failed to create playlist. Make sure the backend is running.')
     }
   }
   
@@ -40,7 +60,7 @@ function Playlists() {
       {/* Create Playlist Button */}
       <button 
         className="btn btn-primary"
-        onClick={() => alert('Create playlist feature coming soon!')}
+        onClick={handleCreatePlaylist}
         style={{ marginBottom: 'var(--spacing-xl)' }}
       >
         <Plus size={18} />
@@ -62,6 +82,7 @@ function Playlists() {
                   <img 
                     src={playlist.thumbnail?.thumbnails?.[0]?.url || playlist.thumbnail} 
                     alt={playlist.title}
+                    loading="lazy"
                   />
                 </div>
                 <div className="card-content">
@@ -79,7 +100,7 @@ function Playlists() {
           <ListMusic className="empty-state-icon" />
           <h3 className="empty-state-title">No playlists yet</h3>
           <p className="empty-state-text">Create your first playlist to organize your music</p>
-          <button className="btn btn-primary mt-lg">
+          <button className="btn btn-primary mt-lg" onClick={handleCreatePlaylist}>
             <Plus size={18} />
             Create Playlist
           </button>

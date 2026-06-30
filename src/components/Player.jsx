@@ -1,14 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import YouTube from 'react-youtube'
 import { usePlayerStore } from '../store'
+import { addLikedSong, removeLikedSong, checkLikedSong, getUserPlaylists, addTrackToPlaylist } from '../api'
 import { 
   Play, Pause, SkipBack, SkipForward, 
   Volume2, VolumeX, Heart, ListMusic,
   ChevronUp, ChevronDown, Shuffle, Repeat,
-  Disc3, X, MessageCircle, Send
+  Disc3, X, MessageCircle, Send, Check
 } from 'lucide-react'
 
 function Player() {
+  const store = usePlayerStore()
   const { 
     currentTrack, 
     isPlaying, 
@@ -22,15 +24,25 @@ function Player() {
     volume,
     setVolume,
     queue,
-    currentIndex
-  } = usePlayerStore()
+    currentIndex,
+    shuffle,
+    repeat,
+    toggleShuffle,
+    cycleRepeat,
+    setPlayerPaused
+  } = store
   
   const [isExpanded, setIsExpanded] = useState(false)
   const [showQueue, setShowQueue] = useState(false)
   const [showComments, setShowComments] = useState(false)
+  const [showPlaylistPicker, setShowPlaylistPicker] = useState(false)
+  const [userPlaylists, setUserPlaylists] = useState([])
+  const [isLiked, setIsLiked] = useState(false)
+  const [likeLoading, setLikeLoading] = useState(false)
   const [commentInput, setCommentInput] = useState('')
   const [playerReady, setPlayerReady] = useState(false)
   const playerRef = useRef(null)
+  const progressRef = useRef(null)
   
   const [comments, setComments] = useState([
     { id: 1, user: 'Music Fan', text: 'Great song! 🎵', time: '2 hours ago' },
@@ -43,6 +55,19 @@ function Player() {
     event.target.setVolume(volume * 100)
   }
   
+  // Sync YouTube player state back to Zustand store
+  // YouTube states: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (cued)
+  const handleStateChange = (event) => {
+    const playerState = event.data
+    if (playerState === 1) {
+      // Playing — ensure isPlaying matches
+      if (!store.isPlaying) store.play()
+    } else if (playerState === 2) {
+      // Paused — ensure isPlaying matches
+      if (store.isPlaying) store.pause()
+    }
+  }
+  
   // Handle play/pause
   useEffect(() => {
     if (playerRef.current && playerReady) {
@@ -53,6 +78,25 @@ function Player() {
       }
     }
   }, [isPlaying, playerReady])
+  
+  // Resilience: if store says isPlaying but YouTube player is paused, resume
+  useEffect(() => {
+    if (!playerRef.current || !playerReady || !isPlaying || !currentTrack) return
+    
+    const check = setInterval(() => {
+      try {
+        const state = playerRef.current?.getPlayerState()
+        // YouTube state 2 = paused
+        if (state === 2) {
+          playerRef.current?.playVideo()
+        }
+      } catch (e) {
+        // Ignore errors during check
+      }
+    }, 3000)
+    
+    return () => clearInterval(check)
+  }, [playerReady, isPlaying, currentTrack?.videoId])
   
   // Handle volume
   useEffect(() => {
@@ -86,11 +130,75 @@ function Player() {
     }
   }
   
-  // Update progress every second
+  // Update progress every second (only when playing and player is ready)
   useEffect(() => {
+    if (!playerReady || !isPlaying || !currentTrack) return
     const interval = setInterval(handleProgress, 1000)
     return () => clearInterval(interval)
-  }, [playerReady])
+  }, [playerReady, isPlaying, currentTrack?.videoId])
+  
+  // Check if current track is liked
+  useEffect(() => {
+    if (!currentTrack?.videoId) return
+    setIsLiked(false)
+    checkLikedSong(currentTrack.videoId)
+      .then(res => setIsLiked(res.data.liked))
+      .catch(() => setIsLiked(false))
+  }, [currentTrack?.videoId])
+  
+  // Toggle like for current track
+  const handleLikeToggle = async () => {
+    if (!currentTrack || likeLoading) return
+    setLikeLoading(true)
+    try {
+      if (isLiked) {
+        await removeLikedSong(currentTrack.videoId)
+        setIsLiked(false)
+      } else {
+        await addLikedSong({
+          videoId: currentTrack.videoId,
+          title: currentTrack.title,
+          artist: currentTrack.artist,
+          thumbnail: currentTrack.thumbnail
+        })
+        setIsLiked(true)
+      }
+    } catch (err) {
+      console.error('Failed to toggle like:', err)
+    } finally {
+      setLikeLoading(false)
+    }
+  }
+  
+  // Open playlist picker and load user playlists
+  const handleOpenPlaylistPicker = async () => {
+    setShowPlaylistPicker(!showPlaylistPicker)
+    if (!showPlaylistPicker) {
+      try {
+        const res = await getUserPlaylists()
+        setUserPlaylists(res.data.playlists || res.data || [])
+      } catch (err) {
+        console.error('Failed to load playlists:', err)
+        setUserPlaylists([])
+      }
+    }
+  }
+  
+  // Add current track to a playlist
+  const handleAddToPlaylist = async (playlistId) => {
+    if (!currentTrack) return
+    try {
+      await addTrackToPlaylist(playlistId, {
+        videoId: currentTrack.videoId,
+        title: currentTrack.title,
+        artist: currentTrack.artist,
+        thumbnail: currentTrack.thumbnail
+      })
+      setShowPlaylistPicker(false)
+    } catch (err) {
+      console.error('Failed to add to playlist:', err)
+    }
+  }
   
   const handleProgressClick = (e) => {
     if (playerRef.current && playerReady && duration) {
@@ -122,8 +230,8 @@ function Player() {
   
   return (
     <div className={`player ${isExpanded ? 'player-expanded' : 'player-collapsed'}`}>
-      {/* Hidden YouTube Player */}
-      <div style={{ display: 'none' }}>
+      {/* Hidden YouTube Player — visually hidden but still visible to browser */}
+      <div style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none', overflow: 'hidden' }}>
         {currentTrack && (
           <YouTube
             videoId={currentTrack.videoId}
@@ -141,6 +249,7 @@ function Player() {
               }
             }}
             onReady={handlePlayerReady}
+            onStateChange={handleStateChange}
             onEnd={handleVideoEnd}
           />
         )}
@@ -159,13 +268,13 @@ function Player() {
         </div>
         
         <div className="player-controls-mini" onClick={(e) => e.stopPropagation()}>
-          <button className="player-btn" onClick={previous}>
+          <button className="player-btn" onClick={previous} aria-label="Previous track">
             <SkipBack size={18} />
           </button>
-          <button className="player-btn player-btn-main" onClick={togglePlay}>
+          <button className="player-btn player-btn-main" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
             {isPlaying ? <Pause size={20} /> : <Play size={20} />}
           </button>
-          <button className="player-btn" onClick={next}>
+          <button className="player-btn" onClick={next} aria-label="Next track">
             <SkipForward size={18} />
           </button>
         </div>
@@ -182,13 +291,13 @@ function Player() {
         </div>
         
         <div className="player-extra-controls-mini" onClick={(e) => e.stopPropagation()}>
-          <button className="player-btn" onClick={() => setVolume(volume === 0 ? 0.8 : 0)}>
+          <button className="player-btn" onClick={() => setVolume(volume === 0 ? 0.8 : 0)} aria-label={volume === 0 ? 'Unmute' : 'Mute'}>
             {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
-          <button className="player-btn" onClick={() => setShowQueue(!showQueue)}>
+          <button className="player-btn" onClick={() => setShowQueue(!showQueue)} aria-label="Toggle queue">
             <ListMusic size={16} />
           </button>
-          <button className="player-btn" onClick={() => setIsExpanded(true)}>
+          <button className="player-btn" onClick={() => setIsExpanded(true)} aria-label="Expand player">
             <ChevronUp size={16} />
           </button>
         </div>
@@ -202,7 +311,7 @@ function Player() {
             <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>
               Now Playing
             </span>
-            <button className="player-btn" onClick={() => setIsExpanded(false)}>
+            <button className="player-btn" onClick={() => setIsExpanded(false)} aria-label="Collapse player">
               <ChevronDown size={24} />
             </button>
           </div>
@@ -238,33 +347,103 @@ function Player() {
           
           {/* Main Controls */}
           <div className="player-expanded-controls">
-            <button className="player-btn" title="Shuffle">
-              <Shuffle size={20} />
+            <button 
+              className={`player-btn ${shuffle ? 'active' : ''}`} 
+              onClick={toggleShuffle}
+              title={shuffle ? 'Shuffle: On' : 'Shuffle: Off'}
+            >
+              <Shuffle size={20} color={shuffle ? 'var(--accent)' : undefined} />
             </button>
-            <button className="player-btn" onClick={previous}>
+            <button className="player-btn" onClick={previous} aria-label="Previous track">
               <SkipBack size={24} />
             </button>
-            <button className="player-btn player-btn-main player-btn-large" onClick={togglePlay}>
+            <button className="player-btn player-btn-main player-btn-large" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
               {isPlaying ? <Pause size={32} /> : <Play size={32} />}
             </button>
-            <button className="player-btn" onClick={next}>
+            <button className="player-btn" onClick={next} aria-label="Next track">
               <SkipForward size={24} />
             </button>
-            <button className="player-btn" title="Repeat">
-              <Repeat size={20} />
+            <button 
+              className={`player-btn ${repeat !== 'off' ? 'active' : ''}`} 
+              onClick={cycleRepeat}
+              title={`Repeat: ${repeat}`}
+            >
+              <Repeat 
+                size={20} 
+                color={repeat !== 'off' ? 'var(--accent)' : undefined}
+              />
             </button>
           </div>
           
           {/* Extra Controls */}
-          <div className="player-expanded-extras">
-            <button className="player-btn" title="Add to playlist">
+          <div className="player-expanded-extras" style={{ position: 'relative' }}>
+            <button className="player-btn" onClick={handleOpenPlaylistPicker} title="Add to playlist">
               <ListMusic size={20} />
             </button>
-            <button className="player-btn" title="Like">
-              <Heart size={20} />
+            <button 
+              className="player-btn" 
+              onClick={handleLikeToggle}
+              title={isLiked ? 'Unlike' : 'Like'}
+              disabled={likeLoading}
+            >
+              <Heart 
+                size={20} 
+                fill={isLiked ? 'var(--accent)' : 'none'}
+                color={isLiked ? 'var(--accent)' : undefined}
+              />
             </button>
+            
+            {/* Playlist picker dropdown */}
+            {showPlaylistPicker && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+                padding: 'var(--spacing-sm)',
+                maxHeight: 200,
+                overflowY: 'auto',
+                minWidth: 200,
+                zIndex: 400
+              }}>
+                {userPlaylists.length === 0 ? (
+                  <span style={{ color: 'var(--text-muted)', fontSize: 13, padding: 'var(--spacing-sm)' }}>
+                    No playlists yet
+                  </span>
+                ) : (
+                  userPlaylists.map((pl, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleAddToPlaylist(pl.playlistId || pl.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 'var(--spacing-sm)',
+                        padding: 'var(--spacing-sm)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-primary)',
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        borderRadius: 'var(--radius-sm)',
+                        width: '100%',
+                        textAlign: 'left'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-container)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+                    >
+                      <ListMusic size={16} />
+                      <span>{pl.title || pl.name}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+            
             <div className="player-volume">
-              <button className="player-btn" onClick={() => setVolume(volume === 0 ? 0.8 : 0)}>
+              <button className="player-btn" onClick={() => setVolume(volume === 0 ? 0.8 : 0)} aria-label={volume === 0 ? 'Unmute' : 'Mute'}>
                 {volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
               </button>
               <div 
@@ -313,7 +492,7 @@ function Player() {
                     }}
                   >
                     <span className="queue-number">{index + 1}</span>
-                    <img src={track.thumbnail} alt={track.title} className="queue-thumb" />
+                    <img src={track.thumbnail} alt={track.title} className="queue-thumb" loading="lazy" />
                     <div className="queue-info">
                       <span className="queue-title">{track.title}</span>
                       <span className="queue-artist">{track.artist}</span>
@@ -401,7 +580,7 @@ function Player() {
         <div className="queue-sidebar">
           <div className="queue-sidebar-header">
             <h3>Queue</h3>
-            <button className="player-btn" onClick={() => setShowQueue(false)}>
+            <button className="player-btn" onClick={() => setShowQueue(false)} aria-label="Close queue">
               <X size={18} />
             </button>
           </div>
@@ -415,7 +594,7 @@ function Player() {
                 }}
               >
                 <span className="queue-number">{index + 1}</span>
-                <img src={track.thumbnail} alt={track.title} className="queue-thumb" />
+                <img src={track.thumbnail} alt={track.title} className="queue-thumb" loading="lazy" />
                 <div className="queue-info">
                   <span className="queue-title">{track.title}</span>
                   <span className="queue-artist">{track.artist}</span>

@@ -1,10 +1,11 @@
 // API Client for Soundscape Backend
 import axios from 'axios'
+import { useAuthStore } from './store'
 
-const API_BASE = 'http://localhost:8000/api'
+const API_BASE = '/api'
 
-// Get token from localStorage
-const getToken = () => localStorage.getItem('soundscape_token')
+// Get token from auth store (single source of truth)
+const getToken = () => useAuthStore.getState().token
 
 const api = axios.create({
   baseURL: API_BASE,

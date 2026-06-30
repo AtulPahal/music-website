@@ -8,14 +8,16 @@ import {
   Settings,
   Plus,
   LogOut,
-  User
+  User,
+  MessageCircle,
+  Sparkles,
+  X
 } from 'lucide-react'
-import { useState } from 'react'
 import { useAuthStore } from '../store'
+import { createPlaylist } from '../api'
 
-function Sidebar({ onOpenSettings }) {
+function Sidebar({ onOpenSettings, mobileOpen, onMobileClose }) {
   const navigate = useNavigate()
-  const [playlists, setPlaylists] = useState([])
   const { user, isAuthenticated, logout } = useAuthStore()
   
   const handleLogout = () => {
@@ -23,26 +25,57 @@ function Sidebar({ onOpenSettings }) {
     navigate('/')
   }
   
+  const handleCreatePlaylist = async () => {
+    const name = prompt('Enter a name for your new playlist:')
+    if (!name || !name.trim()) return
+    try {
+      const res = await createPlaylist(name.trim())
+      const playlistId = res.data.playlistId || res.data.id
+      if (playlistId) {
+        navigate(`/playlist/${playlistId}`)
+      }
+    } catch (err) {
+      console.error('Failed to create playlist:', err)
+      alert('Failed to create playlist. Make sure the backend is running.')
+    }
+  }
+  
   return (
-    <aside className="sidebar">
-      <div className="logo">
-        <div className="logo-icon">
-          <Music />
+    <aside className={`sidebar ${mobileOpen ? 'sidebar-mobile-open' : ''}`}>
+      <div className="sidebar-header">
+        <div className="logo">
+          <div className="logo-icon">
+            <Music />
+          </div>
+          <span className="logo-text">Soundscape</span>
         </div>
-        <span className="logo-text">Soundscape</span>
+        <button 
+          className="mobile-sidebar-close"
+          onClick={onMobileClose}
+          aria-label="Close menu"
+        >
+          <X size={20} />
+        </button>
       </div>
       
       <nav className="nav-section">
         <div className="nav-section-title">Menu</div>
-        <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+        <NavLink to="/" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={onMobileClose}>
           <Home size={20} />
           <span>Home</span>
         </NavLink>
-        <NavLink to="/search" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+        <NavLink to="/search" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={onMobileClose}>
           <Search size={20} />
           <span>Search</span>
         </NavLink>
-
+        <NavLink to="/recommendations" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={onMobileClose}>
+          <Sparkles size={20} />
+          <span>For You</span>
+        </NavLink>
+        <NavLink to="/chat" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`} onClick={onMobileClose}>
+          <MessageCircle size={20} />
+          <span>Chat</span>
+        </NavLink>
       </nav>
       
       {isAuthenticated ? (
@@ -63,7 +96,7 @@ function Sidebar({ onOpenSettings }) {
             <div className="nav-section-title">Create</div>
             <button 
               className="nav-link" 
-              onClick={() => alert('Create playlist feature coming soon!')}
+              onClick={handleCreatePlaylist}
               style={{ width: '100%', border: 'none', background: 'none', cursor: 'pointer' }}
             >
               <Plus size={20} />

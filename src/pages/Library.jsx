@@ -112,6 +112,7 @@ function Library() {
                     <img 
                       src={track.thumbnail} 
                       alt={track.title}
+                      loading="lazy"
                       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                     />
                   </div>
@@ -141,6 +142,7 @@ function Library() {
                   <img 
                     src={album.thumbnail?.thumbnails?.[0]?.url || album.thumbnail} 
                     alt={album.title}
+                    loading="lazy"
                   />
                 </div>
                 <div className="card-content">
@@ -170,6 +172,7 @@ function Library() {
                   <img 
                     src={artist.thumbnail?.thumbnails?.[0]?.url || artist.thumbnail} 
                     alt={artist.name}
+                    loading="lazy"
                   />
                 </div>
                 <div className="card-content">
@@ -200,6 +203,7 @@ function Library() {
                   <img 
                     src={playlist.thumbnail?.thumbnails?.[0]?.url || playlist.thumbnail} 
                     alt={playlist.title}
+                    loading="lazy"
                   />
                 </div>
                 <div className="card-content">

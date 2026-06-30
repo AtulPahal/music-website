@@ -1,16 +1,29 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { useAuthStore } from './store'
 import Layout from './components/Layout'
-import Home from './pages/Home'
-import Search from './pages/Search'
-import Library from './pages/Library'
-import Playlists from './pages/Playlists'
-import PlaylistDetail from './pages/PlaylistDetail'
-import Artist from './pages/Artist'
-import Album from './pages/Album'
-import Login from './pages/Login'
-import Signup from './pages/Signup'
+
+// Lazy-loaded pages for code splitting
+const Home = lazy(() => import('./pages/Home'))
+const Search = lazy(() => import('./pages/Search'))
+const Library = lazy(() => import('./pages/Library'))
+const Playlists = lazy(() => import('./pages/Playlists'))
+const PlaylistDetail = lazy(() => import('./pages/PlaylistDetail'))
+const Artist = lazy(() => import('./pages/Artist'))
+const Album = lazy(() => import('./pages/Album'))
+const Chat = lazy(() => import('./pages/Chat'))
+const Recommendations = lazy(() => import('./pages/Recommendations'))
+const Login = lazy(() => import('./pages/Login'))
+const Signup = lazy(() => import('./pages/Signup'))
+
+// Loading fallback for lazy-loaded routes
+function PageLoading() {
+  return (
+    <div className="loading" style={{ minHeight: '50vh' }}>
+      <div className="spinner"></div>
+    </div>
+  )
+}
 
 
 // Protected Route component
@@ -58,19 +71,20 @@ function App() {
     <BrowserRouter>
       <Routes>
         {/* Public routes - only accessible when NOT logged in */}
-        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+        <Route path="/login" element={<PublicRoute><Suspense fallback={<PageLoading />}><Login /></Suspense></PublicRoute>} />
+        <Route path="/signup" element={<PublicRoute><Suspense fallback={<PageLoading />}><Signup /></Suspense></PublicRoute>} />
         
         {/* Protected routes - require authentication */}
         <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          <Route index element={<Home />} />
-          <Route path="search" element={<Search />} />
-
-          <Route path="library" element={<Library />} />
-          <Route path="playlists" element={<Playlists />} />
-          <Route path="playlist/:id" element={<PlaylistDetail />} />
-          <Route path="artist/:id" element={<Artist />} />
-          <Route path="album/:id" element={<Album />} />
+          <Route index element={<Suspense fallback={<PageLoading />}><Home /></Suspense>} />
+          <Route path="search" element={<Suspense fallback={<PageLoading />}><Search /></Suspense>} />
+          <Route path="recommendations" element={<Suspense fallback={<PageLoading />}><Recommendations /></Suspense>} />
+          <Route path="chat" element={<Suspense fallback={<PageLoading />}><Chat /></Suspense>} />
+          <Route path="library" element={<Suspense fallback={<PageLoading />}><Library /></Suspense>} />
+          <Route path="playlists" element={<Suspense fallback={<PageLoading />}><Playlists /></Suspense>} />
+          <Route path="playlist/:id" element={<Suspense fallback={<PageLoading />}><PlaylistDetail /></Suspense>} />
+          <Route path="artist/:id" element={<Suspense fallback={<PageLoading />}><Artist /></Suspense>} />
+          <Route path="album/:id" element={<Suspense fallback={<PageLoading />}><Album /></Suspense>} />
         </Route>
         
         {/* Catch all - redirect to login if not authenticated, else home */}

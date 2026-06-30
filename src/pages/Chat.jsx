@@ -136,7 +136,7 @@ function Chat() {
       </header>
       
       {/* Quick Actions */}
-      <div style={{ 
+      <div className="quick-actions" style={{ 
         display: 'flex', 
         gap: 'var(--spacing-sm)', 
         padding: 'var(--spacing-md)',
